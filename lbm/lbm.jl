@@ -7,22 +7,22 @@
 
 
 # Constant parameters
-const T   = 200          # Number of timesteps to run
-const Re  = 120.0           # Reynolds number
-const nx  = 150              # Size of the domain in x direction
-const ny  = 50               # Size of the domain in y direction
+const T   = 600          # Number of timesteps to run
+const Re  = 110.0           # Reynolds number
+const nx  = 80              # Size of the domain in x direction
+const ny  = 20              # Size of the domain in y direction
 const q   = 9               # number of flow directions
-const v   = 0.2            # velocity
+const v   = 0.05            # velocity
 const nu  = (v*ny)/(10*Re)  # viscosity
 const tau = (3.0*nu+0.5)    # 1/relaxation
-const plot_frequency = 10
+const plot_frequency = 20
 
 ## Set up the flow grids, weights, and indices
 #
 #  Explain here
 #
 ##
-dirs =     [  0   1   1  -1   0   1   -1   -1    1 ;
+dirs =     [  0   1   0  -1   0   1   -1   -1    1 ;
               0   0   1   0  -1   1    1   -1   -1 ]
 weights =  [4/9 1/9 1/9 1/9 1/9 1/36 1/36 1/36 1/36]
 indices =  [  4   5   6;  1   2   3;   7    8    9 ]
@@ -41,8 +41,8 @@ obst_coords = [nx/2, ny/2, 3]  # [x, y, radius]
 y = collect(1:ny)
 x = collect(1:nx)'
 obst = (x.-obst_coords[1]).^2 .+ (y.-obst_coords[2]).^2 .<= obst_coords[3].^2
-obst[:,1] = true
-obst[:,end] = true
+obst[1,:] = true
+obst[end,:] = true
 #obst[:,:] = false
  
 ##  Set up initial flow profile
@@ -58,8 +58,8 @@ vel = zeros(ny,nx,2)
 fEq = zeros(ny,nx,9)
 rho = ones(ny,nx)
 
-for j=1:ny
-    vel[j,1,1] = v#*(1+0.01*sin(j/(ny*2*pi)))
+for j=1:ny, i=1:nx
+    vel[j,1,2] = v*(1+0.1*sin((j/ny)/(2*pi)))
 end
 u = vel
 uSqr = u.*u 
@@ -79,21 +79,23 @@ function equilib(dist, rho)
     return dist
 end
 fIn = equilib(fEq, rho)
-
+fLeft = fIn[:,1,:]
 
 ## Propogate time
 #
 ##
 for t=1:T
+    if mod(t, plot_frequency) == 0
+        println(t)
+        writedlm("out/solution.dat."*lpad(string(t),length(string(int(T))),"0"), sqrt(u[:,:,1].*u[:,:,1] + u[:,:,2].*u[:,:,2])) 
+    end
+    
     fIn[:,end,:] = fIn[:,end-1,:] # Right wall bc
     rho = reshape(sum(fIn,3)[:], (ny,nx))
 
-
     u[:,:,1] = (fIn[:,:,2] - fIn[:,:,4] + fIn[:,:,6] - fIn[:,:,7] - fIn[:,:,8] + fIn[:,:,9]) ./ rho[:,:]
     u[:,:,2] = (fIn[:,:,3] - fIn[:,:,5] + fIn[:,:,6] + fIn[:,:,7] - fIn[:,:,8] - fIn[:,:,9]) ./ rho[:,:]
-    u[1,:,:] = vel[1,:,:]
-    u[:,1,:] = 0
-    u[:,end,:] = 0
+    u[:,1,:] = vel[:,1,:]
     uSqr = u.*u
     
     fEq = fIn - (1/tau) * (fIn - equilib(fIn, rho))
@@ -103,6 +105,7 @@ for t=1:T
             for y=1:ny
                 if obst[y,x]
                     fEq[y,x,i] = fIn[y, x, no_slip[i]]
+                    u[y,x,:] = 0
                 end
             end
         end
@@ -110,11 +113,6 @@ for t=1:T
     
     for i=1:q
         fIn[:,:,i] = circshift(fEq[:,:,i],dirs[:,i])
-    end
-
-    if mod(t, plot_frequency) == 0
-        println(t)
-        writedlm("out/solution.dat."*lpad(string(t),length(string(int(T))),"0"), sqrt(u[:,:,1].*u[:,:,1] + u[:,:,2].*u[:,:,2])) 
     end
 end
 println("done!")
