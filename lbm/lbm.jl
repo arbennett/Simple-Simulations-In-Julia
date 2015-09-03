@@ -7,15 +7,15 @@
 
 
 # Constant parameters
-const T   = 12000          # Number of timesteps to run
-const Re  = 150.0           # Reynolds number
+const T   = 9000          # Number of timesteps to run
+const Re  = 20.0           # Reynolds number
 const nx  = 150              # Size of the domain in x direction
-const ny  = 75             # Size of the domain in y direction
+const ny  = 50             # Size of the domain in y direction
 const q   = 9               # number of flow directions
 const v   = 0.05            # velocity
 const nu  = (v*ny)/(10*Re)  # viscosity
 const tau = (3.0*nu+0.5)    # 1/relaxation
-const plot_frequency = 100
+const plot_frequency = T/5
 
 ## Set up the flow grids, weights, and indices
 #
@@ -37,14 +37,14 @@ no_slip =  [  1   4   5   2   3   8    9    6    7 ]
 #  condition detailed above
 #
 ##
-obst_coords = [nx/2, ny/2, 5]  # [x, y, radius]
+obst_coords = [nx/2, ny/2, 3]  # [x, y, radius]
 obst_coords2 = [nx/3,ny/3,4]
 y = collect(1:ny)
 x = collect(1:nx)'
 obst = (x.-obst_coords[1]).^2 .+ (y.-obst_coords[2]).^2 .<= obst_coords[3].^2
 obst = (obst + ((x.-obst_coords2[1]).^2 .+ (y.-obst_coords2[2]).^2 .<= obst_coords2[3].^2) .> 0)
-obst[1,:] = true
-obst[end,:] = true
+#obst[1,:] = true
+#obst[end,:] = true
 #obst[:,:] = false
  
 ##  Set up initial flow profile
@@ -63,8 +63,6 @@ rho = ones(ny,nx)
 for j=1:ny, i=1:nx
     vel[j,i,2] = v*(1+0.1*sin((j/ny)/(2*pi)))
 end
-u = vel
-uSqr = u.*u 
 
 ## Calculate equilibrium for some distribution
 #
@@ -96,14 +94,15 @@ for t=1:T
 
     # Right wall conditions
     fIn[:,end,:] = fIn[:,end-1,:]
-    
-    rho = reshape(sum(fIn,3)[:], (ny,nx))
+    rho = fIn[:,:,1] + fIn[:,:,2] + fIn[:,:,3] + fIn[:,:,4] + fIn[:,:,5] + fIn[:,:,6] + fIn[:,:,7] + fIn[:,:,8] + fIn[:,:,9]    
 
     u[:,:,1] = (fIn[:,:,2] - fIn[:,:,4] + fIn[:,:,6] - fIn[:,:,7] - fIn[:,:,8] + fIn[:,:,9]) ./ rho[:,:]
     u[:,:,2] = (fIn[:,:,3] - fIn[:,:,5] + fIn[:,:,6] + fIn[:,:,7] - fIn[:,:,8] - fIn[:,:,9]) ./ rho[:,:]
     
     # Left wall conditions
-    #u[:,1,:] = vel[:,1,:]
+    u[:,1,:] = vel[:,1,:]
+    #rho[:,1] = 1./(1-u[:,1,2]) .* (fIn[:,1,3] + fIn[:,1,6] + fIn[:,1,7] + 2*(fIn[:,1,5] + fIn[:,1,8] + fIn[:,1,9]))
+    #println(rho[:,1])
 
     fEq = fIn - (1/tau) * (fIn - equilib(u, rho))
     
